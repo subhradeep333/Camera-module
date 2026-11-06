@@ -1,0 +1,17 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Mac OS metadata
+.DS_Store
+
+# Temporary outputs
+scans/
+tmp/
+*.log
