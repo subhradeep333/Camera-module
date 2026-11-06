@@ -1,5 +1,6 @@
 /*
  * ESP32 + OV7670 Dedicated Non-FIFO Driver
+ * Includes Auto-Access Point mode (fallback to 'ESP32-Camera')
  */
 
 #include <OV7670.h>
@@ -10,6 +11,10 @@
 // Wi-Fi Credentials
 const char* WIFI_SSID     = "Subhradeep";
 const char* WIFI_PASSWORD = "12345678";
+
+// Standalone Access Point Credentials (if router fails)
+const char* AP_SSID       = "ESP32-Camera";
+const char* AP_PASSWORD   = "12345678";
 
 OV7670 cam;
 WiFiServer server(80);
@@ -53,19 +58,34 @@ void setup() {
   cam.reset();
   Serial.println("[SUCCESS] OV7670 initialized successfully!");
 
-  // Connect to Wi-Fi
+  // Try Wi-Fi router / hotspot first
   Serial.printf("[WIFI] Connecting to '%s'...", WIFI_SSID);
-  WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_AP_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 15) {
     delay(500);
     Serial.print(".");
+    attempts++;
   }
-  Serial.println("\n[WIFI] Connected!");
-  Serial.print("[WIFI] Camera URL: http://");
-  Serial.println(WiFi.localIP());
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[WIFI] Connected to router!");
+    Serial.print("[WIFI] Camera URL: http://");
+    Serial.println(WiFi.localIP());
+  } else {
+    // Fallback: Broadcast our own private Access Point Wi-Fi!
+    Serial.println("\n[WIFI] Could not connect to router.");
+    Serial.println("[WIFI] Starting Standalone Wi-Fi Hotspot...");
+    WiFi.softAP(AP_SSID, AP_PASSWORD);
+    Serial.printf("[WIFI] Connect your Mac to Wi-Fi: '%s' (Password: '%s')\n", AP_SSID, AP_PASSWORD);
+    Serial.print("[WIFI] Camera URL: http://");
+    Serial.println(WiFi.softAPIP());
+  }
 
   server.begin();
+  Serial.println("[HTTP] Server listening on port 80.");
 }
 
 void loop() {
@@ -79,7 +99,8 @@ void loop() {
     client.println("HTTP/1.1 200 OK");
     client.println("Content-Type: application/json");
     client.println("Connection: close\r\n");
-    client.printf("{\"status\":\"ready\",\"ip\":\"%s\"}\n", WiFi.localIP().toString().c_str());
+    String currentIP = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
+    client.printf("{\"status\":\"ready\",\"ip\":\"%s\"}\n", currentIP.c_str());
     return;
   }
 
@@ -90,5 +111,6 @@ void loop() {
   client.println("<body style='background:#141419;color:#00e5ff;text-align:center;font-family:sans-serif;padding:30px;'>");
   client.println("<h2>📷 Non-FIFO OV7670 Camera Initialized!</h2>");
   client.println("<p style='color:#a0a0b0;'>Hardware connection & I2S DMA active.</p>");
+  client.println("<p style='color:#00ff88;'>Server is live and ready!</p>");
   client.println("</body></html>");
 }
