@@ -38,11 +38,16 @@ class ScannerClient:
                 timeout=self.config.timeout_sec
             )
             if resp.status_code == 200:
-                img_bytes = np.frombuffer(resp.content, dtype=np.uint8)
+                content = resp.content
+                # Strip any accidental leading whitespace before 'BM' magic bytes
+                bm_idx = content.find(b'BM')
+                if bm_idx != -1 and bm_idx > 0:
+                    content = content[bm_idx:]
+                
+                img_bytes = np.frombuffer(content, dtype=np.uint8)
                 frame = cv2.imdecode(img_bytes, cv2.IMREAD_GRAYSCALE)
-                if frame is None and len(resp.content) > 0:
-                    # Debug print only if unexpected content is returned
-                    print(f"[WARN] Failed to decode image ({len(resp.content)} bytes). Response preview: {resp.text[:60]}")
+                if frame is None and len(content) > 0:
+                    print(f"[WARN] Failed to decode image ({len(content)} bytes). Response preview: {content[:60]}")
                 return frame
             return None
         except requests.exceptions.RequestException as e:
