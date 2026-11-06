@@ -1,14 +1,10 @@
 /*
  * Dedicated Non-FIFO OV7670 Camera Server using kobatan/OV7670-ESP32 Library
- * 
- * Requires:
- *   - OV7670-ESP32 library installed via:
- *     Sketch > Include Library > Add .ZIP Library...
- *   - ESP32 board package 2.0.17 (Tools > Board > Boards Manager > esp32)
  */
 
 #include <OV7670.h>
 #include <WiFi.h>
+#include <Wire.h>
 #include "camera_pins.h"
 
 // Wi-Fi Credentials
@@ -25,36 +21,36 @@ void setup() {
   Serial.println("  Dedicated Non-FIFO OV7670 Camera Server ");
   Serial.println("==========================================");
 
+  // Initialize Wire for SCCB on our exact pins (SDA=17, SCL=16)
+  Wire.begin(SIOD_GPIO_NUM, SIOC_GPIO_NUM, 100000);
+
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer   = LEDC_TIMER_0;
-  config.pin_d0       = Y2_GPIO_NUM; // D34
-  config.pin_d1       = Y3_GPIO_NUM; // D35
-  config.pin_d2       = Y4_GPIO_NUM; // D32
-  config.pin_d3       = Y5_GPIO_NUM; // VP (D36)
-  config.pin_d4       = Y6_GPIO_NUM; // VN (D39)
-  config.pin_d5       = Y7_GPIO_NUM; // D19
-  config.pin_d6       = Y8_GPIO_NUM; // D4
-  config.pin_d7       = Y9_GPIO_NUM; // D13
-  config.pin_xclk     = XCLK_GPIO_NUM; // D18
-  config.pin_pclk     = PCLK_GPIO_NUM; // D23
-  config.pin_vsync    = VSYNC_GPIO_NUM; // D21
-  config.pin_href     = HREF_GPIO_NUM;  // D22
-  config.pin_sscb_sda = SIOD_GPIO_NUM;  // TX2 (GPIO 17)
-  config.pin_sscb_scl = SIOC_GPIO_NUM;  // RX2 (GPIO 16)
-  config.pin_pwdn     = PWDN_GPIO_NUM;  // GND
-  config.pin_reset    = RESET_GPIO_NUM; // 3.3V
+  
+  // Data bus mapping for I2Scamera
+  config.D0           = Y2_GPIO_NUM; // D34
+  config.D1           = Y3_GPIO_NUM; // D35
+  config.D2           = Y4_GPIO_NUM; // D32
+  config.D3           = Y5_GPIO_NUM; // VP (D36)
+  config.D4           = Y6_GPIO_NUM; // VN (D39)
+  config.D5           = Y7_GPIO_NUM; // D19
+  config.D6           = Y8_GPIO_NUM; // D4
+  config.D7           = Y9_GPIO_NUM; // D13
+  config.XCLK         = XCLK_GPIO_NUM; // D18
+  config.PCLK         = PCLK_GPIO_NUM; // D23
+  config.VSYNC        = VSYNC_GPIO_NUM; // D21
   config.xclk_freq_hz = 10000000;
-  config.pixel_format = CAMERA_PF_GRAYSCALE;
-  config.frame_size   = CAMERA_FS_QQVGA; // 160x120
-  config.fb_count     = 1;
 
   Serial.println("[INFO] Initializing OV7670 with dedicated driver...");
-  esp_err_t err = cam.init(&config, OV7670::Mode::QQVGA_YUV422);
+  esp_err_t err = cam.init(&config, QQVGA, RGB565);
   if (err != ESP_OK) {
     Serial.printf("[ERROR] Camera init failed: 0x%x\n", err);
     while (true) { delay(1000); }
   }
+  
+  // Reset registers over SCCB to load QQVGA RGB565 settings
+  cam.reset();
   Serial.println("[SUCCESS] OV7670 initialized successfully!");
 
   // Connect to Wi-Fi
@@ -79,12 +75,20 @@ void loop() {
   String req = client.readStringUntil('\r');
   client.flush();
 
-  // Simple capture endpoint
-  if (req.indexOf("GET /capture") != -1 || req.indexOf("GET /status") != -1) {
+  if (req.indexOf("GET /status") != -1) {
     client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: text/plain");
+    client.println("Content-Type: application/json");
     client.println("Connection: close\r\n");
-    client.println("Camera Active");
+    client.printf("{\"status\":\"ready\",\"ip\":\"%s\"}\n", WiFi.localIP().toString().c_str());
     return;
   }
+
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html");
+  client.println("Connection: close\r\n");
+  client.println("<!DOCTYPE html><html><head><meta charset='utf-8'><title>OV7670 Ready</title></head>");
+  client.println("<body style='background:#141419;color:#00e5ff;text-align:center;font-family:sans-serif;padding:30px;'>");
+  client.println("<h2>📷 Non-FIFO OV7670 Camera Initialized!</h2>");
+  client.println("<p style='color:#a0a0b0;'>Hardware connection & I2S DMA active.</p>");
+  client.println("</body></html>");
 }
