@@ -1,6 +1,6 @@
 /*
  * ESP32 + OV7670 Dedicated Non-FIFO Driver
- * Includes Auto-Access Point mode (fallback to 'ESP32-Camera')
+ * Features ultra-reliable Open Wi-Fi Hotspot ('ESP32-Camera')
  */
 
 #include <OV7670.h>
@@ -8,13 +8,12 @@
 #include <Wire.h>
 #include "camera_pins.h"
 
-// Wi-Fi Credentials
+// Wi-Fi Credentials for your router / phone hotspot
 const char* WIFI_SSID     = "Subhradeep";
 const char* WIFI_PASSWORD = "12345678";
 
-// Standalone Access Point Credentials (if router fails)
+// Standalone Access Point Name
 const char* AP_SSID       = "ESP32-Camera";
-const char* AP_PASSWORD   = "12345678";
 
 OV7670 cam;
 WiFiServer server(80);
@@ -58,13 +57,13 @@ void setup() {
   cam.reset();
   Serial.println("[SUCCESS] OV7670 initialized successfully!");
 
-  // Try Wi-Fi router / hotspot first
+  // Try router first
   Serial.printf("[WIFI] Connecting to '%s'...", WIFI_SSID);
-  WiFi.mode(WIFI_AP_STA);
+  WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 15) {
+  while (WiFi.status() != WL_CONNECTED && attempts < 10) {
     delay(500);
     Serial.print(".");
     attempts++;
@@ -75,11 +74,18 @@ void setup() {
     Serial.print("[WIFI] Camera URL: http://");
     Serial.println(WiFi.localIP());
   } else {
-    // Fallback: Broadcast our own private Access Point Wi-Fi!
+    // Switch completely to pure Access Point mode on Channel 1
     Serial.println("\n[WIFI] Could not connect to router.");
-    Serial.println("[WIFI] Starting Standalone Wi-Fi Hotspot...");
-    WiFi.softAP(AP_SSID, AP_PASSWORD);
-    Serial.printf("[WIFI] Connect your Mac to Wi-Fi: '%s' (Password: '%s')\n", AP_SSID, AP_PASSWORD);
+    Serial.println("[WIFI] Starting Open Wi-Fi Hotspot on Channel 1...");
+    WiFi.disconnect(true);
+    delay(100);
+    WiFi.mode(WIFI_AP);
+    
+    // Broadcast open network on Channel 1 (no password needed)
+    WiFi.softAP(AP_SSID, NULL, 1);
+    delay(300);
+
+    Serial.printf("[WIFI] Broadcast Active: '%s' (Open network, no password)\n", AP_SSID);
     Serial.print("[WIFI] Camera URL: http://");
     Serial.println(WiFi.softAPIP());
   }
@@ -107,10 +113,10 @@ void loop() {
   client.println("HTTP/1.1 200 OK");
   client.println("Content-Type: text/html");
   client.println("Connection: close\r\n");
-  client.println("<!DOCTYPE html><html><head><meta charset='utf-8'><title>OV7670 Ready</title></head>");
+  client.println("<!DOCTYPE html><html><head><meta charset='utf-8'><title>OV7670 Camera</title></head>");
   client.println("<body style='background:#141419;color:#00e5ff;text-align:center;font-family:sans-serif;padding:30px;'>");
-  client.println("<h2>📷 Non-FIFO OV7670 Camera Initialized!</h2>");
+  client.println("<h2>📷 Non-FIFO OV7670 Camera Live!</h2>");
   client.println("<p style='color:#a0a0b0;'>Hardware connection & I2S DMA active.</p>");
-  client.println("<p style='color:#00ff88;'>Server is live and ready!</p>");
+  client.println("<p style='color:#00ff88;font-size:18px;'>● Connected to ESP32 Hotspot successfully!</p>");
   client.println("</body></html>");
 }
