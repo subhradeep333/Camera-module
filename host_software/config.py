@@ -5,7 +5,7 @@ from dataclasses import dataclass
 @dataclass
 class ScannerConfig:
     # Network
-    esp32_url: str = "http://192.168.1.50"
+    esp32_url: str = "http://192.168.4.1"
     timeout_sec: float = 3.0
     
     # Camera specifications (OV7670 QQVGA)

@@ -14,7 +14,7 @@ import cv2
 
 def main():
     parser = argparse.ArgumentParser(description="OV7670 Live Feed Viewer")
-    parser.add_argument("--ip", type=str, default="192.168.1.50", help="ESP32 IP address (e.g. 192.168.1.50)")
+    parser.add_argument("--ip", type=str, default="192.168.4.1", help="ESP32 IP address (default 192.168.4.1)")
     args = parser.parse_args()
 
     clean_ip = args.ip.replace("http://", "").rstrip("/")

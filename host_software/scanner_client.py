@@ -40,9 +40,12 @@ class ScannerClient:
             if resp.status_code == 200:
                 img_bytes = np.frombuffer(resp.content, dtype=np.uint8)
                 frame = cv2.imdecode(img_bytes, cv2.IMREAD_GRAYSCALE)
+                if frame is None and len(resp.content) > 0:
+                    # Debug print only if unexpected content is returned
+                    print(f"[WARN] Failed to decode image ({len(resp.content)} bytes). Response preview: {resp.text[:60]}")
                 return frame
             return None
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
             return None
 
     def start_stream(
