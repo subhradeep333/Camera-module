@@ -21,3 +21,4 @@
 #define PCLK_GPIO_NUM     23   // D23 (PLK)
 
 #endif // CAMERA_PINS_H
+
